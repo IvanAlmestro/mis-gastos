@@ -198,6 +198,8 @@ persona usando 2 dispositivos alcanza y sobra.
    ```json
    {
      "rules": {
+       ".read": false,
+       ".write": false,
        "mis-gastos": {
          "$code": {
            ".read": "$code.matches(/^[a-z0-9-]{6,64}$/)",
@@ -205,9 +207,7 @@ persona usando 2 dispositivos alcanza y sobra.
            ".validate": "newData.hasChildren(['version','updatedAt','categories','incomes','expenses','bills'])"
          }
        }
-     },
-     ".read": false,
-     ".write": false
+     }
    }
    ```
 

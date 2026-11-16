@@ -1,0 +1,9 @@
+# Archivos que NO se suben al deploy (Vercel)
+src/
+target/
+.idea/
+.mvn/
+pom.xml
+.gitignore
+.vercelignore
+README.md

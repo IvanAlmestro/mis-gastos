@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Mis Gastos · Panel del estudiante</title>
+  <meta name="description" content="Control de gastos personales y presupuesto mensual para estudiantes." />
+
+  <!-- Tailwind CSS (CDN) -------------------------------------------------- -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Identidad visual propia + modo oscuro controlado por la clase "dark".
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#312e81'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+          },
+          boxShadow: {
+            card: '0 1px 2px rgba(15,23,42,.05), 0 10px 30px -18px rgba(15,23,42,.30)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Tema: se aplica ANTES de pintar para evitar el "flash" de tema claro --->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('gastos-estudiante:theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = saved || (prefersDark ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        document.documentElement.style.colorScheme = theme;
+      } catch (e) { /* sin localStorage: se usa el tema claro por defecto */ }
+    })();
+  </script>
+
+  <!-- Chart.js (CDN) para los gráficos de estadísticas --------------------- -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body class="min-h-screen font-sans antialiased">
+
+  <!-- =====================================================================
+       HEADER: marca, selector de mes/año y acciones de backup
+       ===================================================================== -->
+  <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+    <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+      <div class="flex items-center gap-3">
+        <div class="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-lg shadow-card">💸</div>
+        <div class="leading-tight">
+          <h1 class="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Mis Gastos</h1>
+          <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Presupuesto mensual del estudiante</p>
+        </div>
+        <span id="header-month-chip"
+              class="ml-2 hidden rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline dark:bg-brand-500/15 dark:text-brand-300"></span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Navegación de meses -->
+        <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <button id="month-prev" type="button" class="nav-arrow" title="Mes anterior" aria-label="Mes anterior">‹</button>
+          <input id="month-picker" type="month"
+                 class="rounded-lg px-1 py-1 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-200 dark:text-slate-200 dark:focus:ring-brand-500/40"
+                 aria-label="Mes y año" />
+          <button id="month-next" type="button" class="nav-arrow" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+        </div>
+
+        <button id="btn-today" type="button" class="btn btn-ghost">Hoy</button>
+        <button id="btn-export" type="button" class="btn btn-ghost" title="Descargar un backup en JSON">⬇︎ Exportar</button>
+        <button id="btn-import" type="button" class="btn btn-ghost" title="Restaurar desde un backup JSON">⬆︎ Importar</button>
+
+        <!-- Sincronización en la nube (Firebase, opcional) -->
+        <button id="btn-sync" type="button" class="btn btn-ghost" title="Sincronización en la nube" aria-label="Sincronización en la nube">
+          <span id="sync-icon" aria-hidden="true">☁️</span>
+        </button>
+
+        <!-- Modo claro / oscuro -->
+        <button id="theme-toggle" type="button" class="btn btn-ghost" title="Cambiar tema" aria-label="Cambiar tema">
+          <span id="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+        <input id="file-import" type="file" accept=".json,application/json" class="hidden" />
+      </div>
+    </div>
+
+    <!-- Pestañas / navegación principal -->
+    <nav id="tabs" class="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8" role="tablist">
+      <button type="button" class="tab" data-view="resumen" aria-selected="true">📊 Resumen</button>
+      <button type="button" class="tab" data-view="gastos" aria-selected="false">🧾 Gastos</button>
+      <button type="button" class="tab" data-view="estadisticas" aria-selected="false">📈 Estadísticas</button>
+      <button type="button" class="tab" data-view="vencimientos" aria-selected="false">
+        📅 Vencimientos
+        <span id="bills-badge" class="tab-badge hidden">0</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+
+    <!-- ===================================================================
+         VISTA 1 · RESUMEN DE BALANCE
+         =================================================================== -->
+    <section id="view-resumen" class="view space-y-6">
+
+      <!-- Tarjetas de balance en tiempo real -->
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <article class="card">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="card-label">Dinero disponible total</p>
+              <p id="stat-available" class="card-value">$ 0</p>
+            </div>
+            <span class="card-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">💰</span>
+          </div>
+          <p class="card-hint">Todos tus ingresos menos todos tus gastos</p>
+        </article>
+
+        <article class="card">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="card-label">Total gastado en <span data-month-label>este mes</span></p>
+              <p id="stat-spent" class="card-value">$ 0</p>
+            </div>
+            <span class="card-icon bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">🧾</span>
+          </div>
+          <p class="card-hint" id="stat-spent-count">0 movimientos registrados</p>
+        </article>
+
+        <article class="card sm:col-span-2 xl:col-span-1">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+              <p class="card-label">Saldo restante del mes</p>
+              <p id="stat-remaining" class="card-value">$ 0</p>
+            </div>
+            <span id="stat-progress-pct" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">0%</span>
+          </div>
+
+          <!-- Barra de progreso que cambia de color según el presupuesto restante -->
+          <div class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Presupuesto consumido">
+            <div id="stat-progress" class="h-full w-0 rounded-full bg-emerald-500 transition-all duration-500"></div>
+          </div>
+          <p class="card-hint" id="stat-progress-hint">Sin presupuesto registrado para este mes</p>
+        </article>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-5">
+
+        <!-- Formulario de ingresos -->
+        <div class="card lg:col-span-2">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="section-title" id="income-form-title">Registrar ingreso</h2>
+            <button id="income-cancel-edit" type="button" class="btn btn-ghost btn-sm hidden">Cancelar</button>
+          </div>
+
+          <form id="income-form" class="mt-4 space-y-3" autocomplete="off">
+            <div>
+              <label class="label" for="income-concept">Concepto</label>
+              <input id="income-concept" name="incomeConcept" type="text" list="income-concepts"
+                     class="input" placeholder="Transferencia mensual" required />
+              <datalist id="income-concepts">
+                <option value="Transferencia mensual"></option>
+                <option value="Extra"></option>
+                <option value="Beca"></option>
+                <option value="Trabajo / Freelance"></option>
+                <option value="Venta"></option>
+                <option value="Reintegro"></option>
+              </datalist>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label" for="income-amount">Monto</label>
+                <input id="income-amount" name="incomeAmount" type="number" min="0" step="0.01"
+                       class="input" placeholder="0,00" required />
+              </div>
+              <div>
+                <label class="label" for="income-date">Fecha</label>
+                <input id="income-date" name="incomeDate" type="date" class="input" required />
+              </div>
+            </div>
+
+            <div>
+              <label class="label" for="income-note">Nota <span class="font-normal text-slate-400 dark:text-slate-500">(opcional)</span></label>
+              <input id="income-note" name="incomeNote" type="text" class="input" placeholder="Ej: mes de junio" />
+            </div>
+
+            <button id="income-submit" type="submit" class="btn btn-primary w-full">＋ Agregar ingreso</button>
+          </form>
+        </div>
+
+        <!-- Listado de ingresos del mes -->
+        <div class="card lg:col-span-3">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="section-title">Ingresos de <span data-month-label>este mes</span></h2>
+            <span id="incomes-total" class="badge badge-emerald">$ 0</span>
+          </div>
+          <ul id="income-list" class="mt-4 divide-y divide-slate-100 dark:divide-slate-800"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VISTA 2 · ANOTADOR RÁPIDO DE GASTOS
+         =================================================================== -->
+    <section id="view-gastos" class="view hidden space-y-6">
+
+      <!-- Formulario ágil: cargar un gasto en segundos -->
+      <div class="card">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="section-title" id="expense-form-title">Anotar gasto rápido</h2>
+          <button id="expense-cancel-edit" type="button" class="btn btn-ghost btn-sm hidden">Cancelar edición</button>
+        </div>
+
+        <form id="expense-form" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-12" autocomplete="off">
+          <div class="sm:col-span-2 lg:col-span-4">
+            <label class="label" for="expense-description">Descripción</label>
+            <input id="expense-description" name="expenseDescription" type="text" class="input"
+                   placeholder="Ej: Súper de la semana" required />
+          </div>
+          <div class="lg:col-span-2">
+            <label class="label" for="expense-amount">Monto</label>
+            <input id="expense-amount" name="expenseAmount" type="number" min="0" step="0.01"
+                   class="input" placeholder="0,00" required />
+          </div>
+          <div class="lg:col-span-2">
+            <label class="label" for="expense-date">Fecha</label>
+            <input id="expense-date" name="expenseDate" type="date" class="input" required />
+          </div>
+          <div class="lg:col-span-2">
+            <label class="label" for="expense-category">Categoría</label>
+            <select id="expense-category" name="expenseCategoryId" class="input"></select>
+          </div>
+          <div class="lg:col-span-2">
+            <label class="label" for="expense-method">Medio de pago</label>
+            <select id="expense-method" name="expenseMethod" class="input"></select>
+          </div>
+
+          <div class="sm:col-span-2 lg:col-span-12">
+            <button id="expense-submit" type="submit" class="btn btn-primary w-full sm:w-auto">＋ Agregar gasto</button>
+            <span class="ml-0 mt-2 block text-xs text-slate-400 sm:ml-3 sm:mt-0 sm:inline dark:text-slate-500">
+              Tip: elegí la categoría con un clic y presioná <kbd class="kbd">Enter</kbd> para guardar.
+            </span>
+          </div>
+        </form>
+
+        <!-- Chips de categorías: selección rápida + gestión de categorías propias -->
+        <div class="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Categorías</p>
+          <div id="category-chips" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Historial de movimientos -->
+      <div class="card">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="section-title">Historial de <span data-month-label>este mes</span></h2>
+          <span id="expense-count" class="badge badge-slate">0 movimientos</span>
+        </div>
+
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="label" for="search-input">Buscar</label>
+            <input id="search-input" type="search" class="input" placeholder="Descripción, categoría o medio de pago…" />
+          </div>
+          <div>
+            <label class="label" for="filter-category">Filtrar por categoría</label>
+            <select id="filter-category" class="input"></select>
+          </div>
+        </div>
+
+        <ul id="expense-list" class="mt-4 divide-y divide-slate-100 dark:divide-slate-800"></ul>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VISTA 3 · ESTADÍSTICAS
+         =================================================================== -->
+    <section id="view-estadisticas" class="view hidden space-y-6">
+
+      <div class="grid gap-6 lg:grid-cols-5">
+        <!-- Gráfico -->
+        <div class="card lg:col-span-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="section-title">Gasto por categoría · <span data-month-label>este mes</span></h2>
+            <div class="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+              <button id="btn-chart-doughnut" type="button" class="chart-toggle" aria-pressed="true">🍩 Torta</button>
+              <button id="btn-chart-bar" type="button" class="chart-toggle" aria-pressed="false">📊 Barras</button>
+            </div>
+          </div>
+
+          <div class="relative mt-4 h-72 sm:h-80">
+            <canvas id="chart-categories"></canvas>
+            <div id="chart-empty" class="absolute inset-0 hidden place-items-center text-center">
+              <div>
+                <p class="text-3xl">🫙</p>
+                <p class="mt-2 text-sm font-medium text-slate-400 dark:text-slate-500">Todavía no hay gastos en este mes.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose numérico -->
+        <div class="card lg:col-span-2">
+          <h2 class="section-title">Desglose por categoría</h2>
+          <ul id="category-breakdown" class="mt-4 space-y-3"></ul>
+        </div>
+      </div>
+
+      <!-- Tarjetas de diagnóstico rápido -->
+      <div class="grid gap-4 md:grid-cols-3">
+        <article class="card">
+          <div class="flex items-center gap-2">
+            <span class="card-icon bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">🔥</span>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Top gastos más grandes</h3>
+          </div>
+          <ul id="diag-top" class="mt-4 space-y-3"></ul>
+        </article>
+
+        <article class="card">
+          <div class="flex items-center gap-2">
+            <span class="card-icon bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">🐜</span>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Categoría más frecuente</h3>
+          </div>
+          <div id="diag-frequent" class="mt-4"></div>
+        </article>
+
+        <article class="card">
+          <div class="flex items-center gap-2">
+            <span class="card-icon bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">💥</span>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Categoría de mayor impacto</h3>
+          </div>
+          <div id="diag-impact" class="mt-4"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VISTA 4 · AGENDA DE VENCIMIENTOS
+         =================================================================== -->
+    <section id="view-vencimientos" class="view hidden space-y-6">
+
+      <!-- Resumen de vencimientos -->
+      <div class="grid gap-4 sm:grid-cols-3">
+        <article class="card">
+          <p class="card-label">Total pendiente</p>
+          <p id="bill-total-pending" class="card-value">$ 0</p>
+          <p class="card-hint">Suma de todos los pagos por vencer</p>
+        </article>
+        <article class="card">
+          <p class="card-label">Vencidos</p>
+          <p id="bill-total-overdue" class="card-value text-rose-600 dark:text-rose-400">$ 0</p>
+          <p class="card-hint" id="bill-count-overdue">Sin vencimientos atrasados</p>
+        </article>
+        <article class="card">
+          <p class="card-label">Vencen en 5 días</p>
+          <p id="bill-total-soon" class="card-value text-amber-600 dark:text-amber-400">$ 0</p>
+          <p class="card-hint" id="bill-count-soon">Nada urgente por ahora</p>
+        </article>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-5">
+        <!-- Formulario de vencimientos -->
+        <div class="card lg:col-span-2">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="section-title" id="bill-form-title">Nuevo vencimiento</h2>
+            <button id="bill-cancel-edit" type="button" class="btn btn-ghost btn-sm hidden">Cancelar</button>
+          </div>
+
+          <form id="bill-form" class="mt-4 space-y-3" autocomplete="off">
+            <div>
+              <label class="label" for="bill-name">Servicio / Concepto</label>
+              <input id="bill-name" name="billName" type="text" class="input"
+                     placeholder="Ej: Internet, Luz, Alquiler…" required />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label" for="bill-amount">Monto estimado</label>
+                <input id="bill-amount" name="billAmount" type="number" min="0" step="0.01"
+                       class="input" placeholder="0,00" required />
+              </div>
+              <div>
+                <label class="label" for="bill-date">Vencimiento</label>
+                <input id="bill-date" name="billDueDate" type="date" class="input" required />
+              </div>
+            </div>
+            <div>
+              <label class="label" for="bill-status">Estado</label>
+              <select id="bill-status" name="billStatus" class="input">
+                <option value="pendiente">Pendiente</option>
+                <option value="pagado">Pagado</option>
+              </select>
+            </div>
+            <button id="bill-submit" type="submit" class="btn btn-primary w-full">＋ Guardar vencimiento</button>
+          </form>
+        </div>
+
+        <!-- Listado de vencimientos -->
+        <div class="card lg:col-span-3">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="section-title">Agenda de pagos</h2>
+            <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <input id="bill-show-paid" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300 dark:border-slate-600 dark:bg-slate-800" checked />
+              Mostrar pagados
+            </label>
+          </div>
+          <ul id="bill-list" class="mt-4 space-y-3"></ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-10 pb-6 text-center text-xs text-slate-400 dark:text-slate-500">
+      Por defecto tus datos se guardan en este navegador (localStorage). Si activás
+      <strong class="font-semibold text-slate-500 dark:text-slate-400">☁️ Sincronización</strong>,
+      también se replican en tu proyecto de Firebase. Hacé backups periódicos con
+      <strong class="font-semibold text-slate-500 dark:text-slate-400">Exportar</strong>.
+    </footer>
+  </main>
+
+  <!-- Contenedores globales para notificaciones y modales -->
+  <div id="toast-container" class="pointer-events-none fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2"></div>
+  <div id="modal-root"></div>
+
+  <noscript>
+    <p style="padding:2rem;text-align:center">Esta aplicación necesita JavaScript activado.</p>
+  </noscript>
+
+  <!-- =====================================================================
+       SCRIPTS: se cargan en orden porque comparten el namespace global App.
+       Usamos scripts clásicos (no módulos ES) para que la app funcione
+       abriendo el archivo index.html directamente (file://) sin servidor.
+       core/ = motor (estado, ui, tema, gráficos, sync) · views/ = pantallas.
+       ===================================================================== -->
+  <script src="js/core/utils.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/charts.js"></script>
+  <script src="js/core/theme.js"></script>
+  <script src="js/core/firebase-config.js"></script>
+  <script src="js/core/sync.js"></script>
+  <script src="js/views/budget.js"></script>
+  <script src="js/views/expenses.js"></script>
+  <script src="js/views/stats.js"></script>
+  <script src="js/views/bills.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

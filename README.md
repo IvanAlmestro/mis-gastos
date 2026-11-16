@@ -203,8 +203,7 @@ persona usando 2 dispositivos alcanza y sobra.
        "mis-gastos": {
          "$code": {
            ".read": "$code.matches(/^[a-z0-9-]{6,64}$/)",
-           ".write": "$code.matches(/^[a-z0-9-]{6,64}$/)",
-           ".validate": "newData.hasChildren(['version','updatedAt','categories','incomes','expenses','bills'])"
+           ".write": "$code.matches(/^[a-z0-9-]{6,64}$/)"
          }
        }
      }

@@ -17,8 +17,8 @@
 window.FIREBASE_CONFIG = {
   apiKey: '',
   authDomain: '',
-  databaseURL: '', // ej: "https://TU-PROYECTO-default-rtdb.firebaseio.com"
-  projectId: '',
+  databaseURL: 'https://mis-gastos-67b8d-default-rtdb.firebaseio.com',
+  projectId: 'mis-gastos-67b8d',
   storageBucket: '',
   messagingSenderId: '',
   appId: ''

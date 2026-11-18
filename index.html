@@ -52,7 +52,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=2" />
 </head>
 
 <body class="min-h-screen font-sans antialiased">
@@ -451,18 +451,22 @@
        Usamos scripts clásicos (no módulos ES) para que la app funcione
        abriendo el archivo index.html directamente (file://) sin servidor.
        core/ = motor (estado, ui, tema, gráficos, sync) · views/ = pantallas.
+
+       El "?v=2" es un cache-buster: GitHub Pages sirve los archivos con
+       cache de 10 minutos, así que al cambiar código hay que subir el número
+       para que los dispositivos descarguen la versión nueva sin esperar.
        ===================================================================== -->
-  <script src="js/core/utils.js"></script>
-  <script src="js/core/store.js"></script>
-  <script src="js/core/ui.js"></script>
-  <script src="js/core/charts.js"></script>
-  <script src="js/core/theme.js"></script>
-  <script src="js/core/firebase-config.js"></script>
-  <script src="js/core/sync.js"></script>
-  <script src="js/views/budget.js"></script>
-  <script src="js/views/expenses.js"></script>
-  <script src="js/views/stats.js"></script>
-  <script src="js/views/bills.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/core/utils.js?v=2"></script>
+  <script src="js/core/store.js?v=2"></script>
+  <script src="js/core/ui.js?v=2"></script>
+  <script src="js/core/charts.js?v=2"></script>
+  <script src="js/core/theme.js?v=2"></script>
+  <script src="js/core/firebase-config.js?v=2"></script>
+  <script src="js/core/sync.js?v=2"></script>
+  <script src="js/views/budget.js?v=2"></script>
+  <script src="js/views/expenses.js?v=2"></script>
+  <script src="js/views/stats.js?v=2"></script>
+  <script src="js/views/bills.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

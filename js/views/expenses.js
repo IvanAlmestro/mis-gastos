@@ -15,48 +15,91 @@ window.App = window.App || {};
 
   /* --- Selects y chips de categorías ------------------------------------- */
 
-  /** Rellena el <select> de categorías conservando la selección previa. */
-  function fillCategorySelect(select, keepValue) {
-    var previous = keepValue || select.value || 'otros';
-    select.innerHTML = Store.categories().map(function (cat) {
+  /** Genera las <option> de una lista de categorías (hojas). */
+  function categoryOptions(categories) {
+    return categories.map(function (cat) {
       return '<option value="' + Utils.escapeHtml(cat.id) + '">' +
         Utils.escapeHtml(cat.icon + '  ' + cat.name) + '</option>';
     }).join('');
-    // Restaura la selección si la categoría todavía existe.
-    var exists = Store.categories().some(function (c) { return c.id === previous; });
-    select.value = exists ? previous : 'otros';
   }
 
-  function fillMethodSelect(select) {
-    var previous = select.value;
+  /** Rellena el <select> de categorías agrupado, conservando la selección previa. */
+  function fillCategorySelect(select, keepValue) {
+    var previous = keepValue || select.value || Store.defaultCategoryId();
+    var html = Store.groups().map(function (group) {
+      var children = Store.categoriesInGroup(group.id);
+      if (!children.length) return '';
+      return '<optgroup label="' + Utils.escapeHtml(group.icon + '  ' + group.name) + '">' +
+        categoryOptions(children) + '</optgroup>';
+    }).join('');
+
+    var custom = Store.customCategories();
+    if (custom.length) {
+      html += '<optgroup label="⭐  Propias">' + categoryOptions(custom) + '</optgroup>';
+    }
+
+    select.innerHTML = html;
+    // Restaura la selección si la categoría todavía existe.
+    var exists = Store.categories().some(function (c) { return c.id === previous; });
+    select.value = exists ? previous : Store.defaultCategoryId();
+  }
+
+  function fillMethodSelect(select, keepValue) {
+    var previous = keepValue || select.value || Store.defaultPaymentMethod();
     select.innerHTML = Store.paymentMethods().map(function (method) {
       return '<option value="' + Utils.escapeHtml(method) + '">' + Utils.escapeHtml(method) + '</option>';
     }).join('');
-    if (Store.paymentMethods().indexOf(previous) >= 0) select.value = previous;
+    select.value = Store.paymentMethods().indexOf(previous) >= 0
+      ? previous
+      : Store.defaultPaymentMethod();
   }
 
-  /** Dibuja los chips de categoría (selección rápida + gestión). */
+  /** Dibuja los chips en dos niveles: grupo → subcategorías del grupo activo. */
   function renderCategoryChips() {
     var container = $('category-chips');
     var current = $('expense-category').value;
+    var activeGroup = Store.groupOfCategory(current);
+    var activeKey = activeGroup ? activeGroup.id : 'custom';
 
-    var chips = Store.categories().map(function (cat) {
+    function chipStyle(color, active) {
+      return active
+        ? 'background:' + color + ';color:#fff'
+        : 'background:' + color + '1f;color:' + color;
+    }
+
+    var groupsHtml = Store.groups().map(function (group) {
+      var active = group.id === activeKey;
+      return '<button type="button" class="chip" data-group="' + Utils.escapeHtml(group.id) + '"' +
+        ' aria-pressed="' + active + '" style="' + chipStyle(group.color, active) + '">' +
+        Utils.escapeHtml(group.icon + '  ' + group.name) + '</button>';
+    }).join('');
+
+    var custom = Store.customCategories();
+    if (custom.length) {
+      var active = activeKey === 'custom';
+      groupsHtml += '<button type="button" class="chip" data-group="custom"' +
+        ' aria-pressed="' + active + '" style="' + chipStyle('#6366f1', active) + '">⭐  Propias</button>';
+    }
+
+    var subCategories = activeKey === 'custom' ? custom : Store.categoriesInGroup(activeKey);
+    var subHtml = subCategories.map(function (cat) {
       var active = cat.id === current;
-      var style = active
-        ? 'background:' + cat.color + ';color:#fff'
-        : 'background:' + cat.color + '1f;color:' + cat.color;
       var remove = cat.custom
         ? '<span class="chip-remove" data-remove="' + Utils.escapeHtml(cat.id) + '" title="Eliminar categoría">✕</span>'
         : '';
-      return '<button type="button" class="chip" data-cat="' + Utils.escapeHtml(cat.id) + '"' +
-        ' aria-pressed="' + active + '" style="' + style + '">' +
-        '<span>' + Utils.escapeHtml(cat.icon) + '</span>' + Utils.escapeHtml(cat.name) + remove +
-        '</button>';
+      return '<button type="button" class="chip chip-sub" data-cat="' + Utils.escapeHtml(cat.id) + '"' +
+        ' aria-pressed="' + active + '" style="' + chipStyle(cat.color, active) + '">' +
+        Utils.escapeHtml(cat.icon + '  ' + cat.name) + remove + '</button>';
     }).join('');
 
     var newChip = '<button type="button" class="chip chip-add" data-new-category>＋ Nueva categoría</button>';
 
-    container.innerHTML = chips + newChip;
+    container.innerHTML =
+      '<div class="flex flex-wrap gap-2">' + groupsHtml + newChip + '</div>' +
+      '<p class="mb-2 mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">' +
+        'Subcategorías' +
+      '</p>' +
+      '<div class="flex flex-wrap gap-2">' + subHtml + '</div>';
   }
 
   /* --- Historial --------------------------------------------------------- */
@@ -69,8 +112,8 @@ window.App = window.App || {};
     return Store.expensesInMonth(month).filter(function (e) {
       if (categoryFilter !== 'all' && e.categoryId !== categoryFilter) return false;
       if (!search) return true;
-      var cat = Store.categoryById(e.categoryId);
-      var haystack = (e.description + ' ' + cat.name + ' ' + e.method + ' ' + e.date).toLowerCase();
+      var haystack = (e.description + ' ' + Store.categoryLabel(e.categoryId) + ' ' +
+        e.method + ' ' + e.date).toLowerCase();
       return haystack.indexOf(search) >= 0;
     }).sort(function (a, b) {
       if (a.date === b.date) return 0;
@@ -107,7 +150,7 @@ window.App = window.App || {};
             '<p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">' +
               Utils.escapeHtml(expense.description) + '</p>' +
             '<p class="truncate text-xs text-slate-400 dark:text-slate-500">' + Utils.formatDate(expense.date) + ' · ' +
-              Utils.escapeHtml(cat.name) + ' · ' + Utils.escapeHtml(expense.method) + '</p>' +
+              Utils.escapeHtml(Store.categoryLabel(expense.categoryId)) + ' · ' + Utils.escapeHtml(expense.method) + '</p>' +
           '</div>' +
           '<span class="row-amount text-rose-600 dark:text-rose-400">− ' + Utils.money(expense.amount) + '</span>' +
           '<div class="flex gap-1">' +
@@ -121,11 +164,21 @@ window.App = window.App || {};
   function renderFilters() {
     var select = $('filter-category');
     var previous = App.ui.category || 'all';
-    select.innerHTML = '<option value="all">Todas las categorías</option>' +
-      Store.categories().map(function (cat) {
-        return '<option value="' + Utils.escapeHtml(cat.id) + '">' +
-          Utils.escapeHtml(cat.icon + '  ' + cat.name) + '</option>';
-      }).join('');
+    var html = '<option value="all">Todas las categorías</option>';
+
+    Store.groups().forEach(function (group) {
+      var children = Store.categoriesInGroup(group.id);
+      if (!children.length) return;
+      html += '<optgroup label="' + Utils.escapeHtml(group.icon + '  ' + group.name) + '">' +
+        categoryOptions(children) + '</optgroup>';
+    });
+
+    var custom = Store.customCategories();
+    if (custom.length) {
+      html += '<optgroup label="⭐  Propias">' + categoryOptions(custom) + '</optgroup>';
+    }
+
+    select.innerHTML = html;
     select.value = previous;
   }
 
@@ -135,6 +188,8 @@ window.App = window.App || {};
     editingId = null;
     $('expense-form').reset();
     $('expense-date').value = Utils.todayISO();
+    $('expense-category').value = Store.defaultCategoryId();
+    $('expense-method').value = Store.defaultPaymentMethod();
     $('expense-form-title').textContent = 'Anotar gasto rápido';
     $('expense-submit').textContent = '＋ Agregar gasto';
     $('expense-cancel-edit').classList.add('hidden');
@@ -246,6 +301,18 @@ window.App = window.App || {};
       }
 
       if (ev.target.closest('[data-new-category]')) { createCategory(); return; }
+
+      // Elegir un grupo muestra sus subcategorías y selecciona la primera.
+      var group = ev.target.closest('[data-group]');
+      if (group) {
+        var groupId = group.getAttribute('data-group');
+        var groupCats = groupId === 'custom'
+          ? Store.customCategories()
+          : Store.categoriesInGroup(groupId);
+        if (groupCats.length) $('expense-category').value = groupCats[0].id;
+        renderCategoryChips();
+        return;
+      }
 
       var chip = ev.target.closest('[data-cat]');
       if (!chip) return;

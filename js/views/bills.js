@@ -140,7 +140,7 @@ window.App = window.App || {};
     UI.choose({
       title: 'Marcar "' + bill.name + '" como pagado',
       message: '¿Querés descontar ' + Utils.money(bill.amount) +
-        ' como un gasto en la categoría "Facturas / Servicios"?',
+        ' como un gasto en "' + Store.categoryLabel(Store.billsCategoryId()) + '"?',
       options: [
         { label: 'Sí, registrar el gasto', value: 'expense' },
         { label: 'Solo marcar como pagado', value: 'status', variant: 'ghost' }

@@ -20,6 +20,7 @@ window.App = window.App || {};
     search: '',
     category: 'all',
     chartType: 'doughnut',
+    grouping: 'group', // 'group' = por categoría · 'sub' = por subcategoría
     showPaidBills: true,
     theme: 'light' // lo actualiza App.Theme al arrancar
   };

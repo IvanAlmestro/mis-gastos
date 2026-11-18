@@ -171,7 +171,8 @@ window.App = window.App || {};
 
   function render() {
     var month = App.ui.month;
-    var totals = Store.categoryTotalsInMonth(month);
+    var mode = App.ui.grouping === 'sub' ? 'sub' : 'group';
+    var totals = Store.categoryTotalsInMonth(month, mode);
     var spent = Store.spentInMonth(month);
 
     renderChart(totals);
@@ -192,6 +193,19 @@ window.App = window.App || {};
       App.ui.chartType = 'bar';
       $('btn-chart-doughnut').setAttribute('aria-pressed', 'false');
       $('btn-chart-bar').setAttribute('aria-pressed', 'true');
+      render();
+    });
+
+    $('btn-stats-group').addEventListener('click', function () {
+      App.ui.grouping = 'group';
+      $('btn-stats-group').setAttribute('aria-pressed', 'true');
+      $('btn-stats-sub').setAttribute('aria-pressed', 'false');
+      render();
+    });
+    $('btn-stats-sub').addEventListener('click', function () {
+      App.ui.grouping = 'sub';
+      $('btn-stats-group').setAttribute('aria-pressed', 'false');
+      $('btn-stats-sub').setAttribute('aria-pressed', 'true');
       render();
     });
   }

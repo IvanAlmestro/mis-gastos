@@ -4,11 +4,15 @@
    Modelo de datos:
    {
      version: 1,
-     categories: [{ id, name, icon, color, custom }],
+     categories: [{ id, name, icon, color, parentId, custom }],
      incomes:    [{ id, date, amount, concept, note }],
      expenses:   [{ id, date, amount, description, categoryId, method, billId }],
      bills:      [{ id, name, amount, dueDate, status, paidAt, expenseId }]
    }
+   Las categorías son de dos niveles: `parentId` apunta a un grupo (definido
+   en DEFAULT_GROUPS); las categorías propias no tienen grupo. Los gastos
+   guardan siempre la subcategoría (hoja) en `categoryId`.
+
    Todas las mutaciones pasan por `commit()`, que guarda y notifica a la UI.
    ========================================================================= */
 window.App = window.App || {};
@@ -19,18 +23,73 @@ window.App = window.App || {};
   var Utils = App.Utils;
   var STORAGE_KEY = 'gastos-estudiante:v1';
 
-  /* --- Categorías orientadas a un estudiante ---------------------------- */
-  var DEFAULT_CATEGORIES = [
-    { id: 'alimentacion', name: 'Alimentación / Súper', icon: '🛒', color: '#10b981', custom: false },
-    { id: 'facturas',     name: 'Facturas / Servicios', icon: '🧾', color: '#3b82f6', custom: false },
-    { id: 'transporte',   name: 'Transporte',           icon: '🚌', color: '#f59e0b', custom: false },
-    { id: 'universidad',  name: 'Universidad / Apuntes', icon: '🎓', color: '#8b5cf6', custom: false },
-    { id: 'ocio',         name: 'Salidas / Ocio',       icon: '🎉', color: '#ec4899', custom: false },
-    { id: 'salud',        name: 'Salud / Deporte',      icon: '💪', color: '#ef4444', custom: false },
-    { id: 'otros',        name: 'Otros',                icon: '📦', color: '#64748b', custom: false }
+  var FALLBACK_CATEGORY_ID = 'otros-general';
+  var DEFAULT_CATEGORY_ID = 'comida-supermercado';
+  var BILLS_CATEGORY_ID = 'fijos-otro';
+  var DEFAULT_PAYMENT_METHOD = 'Débito / Transferencia';
+  var PAYMENT_METHODS = ['Efectivo', DEFAULT_PAYMENT_METHOD];
+
+  /* --- Grupos (categorías de primer nivel) ------------------------------ */
+  var DEFAULT_GROUPS = [
+    { id: 'comida',          name: 'Comida',           icon: '🍽️', color: '#10b981' },
+    { id: 'social',          name: 'Social',           icon: '🎉', color: '#ec4899' },
+    { id: 'fijos',           name: 'Fijos',            icon: '🏠', color: '#3b82f6' },
+    { id: 'transporte',      name: 'Transporte',       icon: '🚌', color: '#f59e0b' },
+    { id: 'actividad-fisica', name: 'Actividad física', icon: '🏃', color: '#8b5cf6' },
+    { id: 'antojo',          name: 'Antojo',           icon: '🍦', color: '#f97316' },
+    { id: 'otros',           name: 'Otros',            icon: '📦', color: '#64748b' }
   ];
 
-  var PAYMENT_METHODS = ['Efectivo', 'Débito / Transferencia', 'Mercado Pago / Billetera'];
+  /* --- Subcategorías (hojas que se pueden asignar a un gasto) ----------- */
+  var DEFAULT_CATEGORIES = [
+    { id: 'comida-supermercado', name: 'Supermercado', icon: '🛒', color: '#10b981', parentId: 'comida', custom: false },
+    { id: 'comida-verduleria',   name: 'Verdulería',   icon: '🥬', color: '#22c55e', parentId: 'comida', custom: false },
+    { id: 'comida-carniceria',   name: 'Carnicería',   icon: '🥩', color: '#ef4444', parentId: 'comida', custom: false },
+    { id: 'comida-polleria',     name: 'Pollería',     icon: '🍗', color: '#f97316', parentId: 'comida', custom: false },
+    { id: 'comida-panaderia',    name: 'Panadería',    icon: '🥖', color: '#eab308', parentId: 'comida', custom: false },
+    { id: 'comida-agua',         name: 'Agua',         icon: '💧', color: '#0ea5e9', parentId: 'comida', custom: false },
+
+    { id: 'social-juntada', name: 'Juntada de pibes', icon: '🧉', color: '#ec4899', parentId: 'social', custom: false },
+    { id: 'social-bar',     name: 'Bar',              icon: '🍻', color: '#f43f5e', parentId: 'social', custom: false },
+    { id: 'social-evento',  name: 'Evento',           icon: '🎟️', color: '#a855f7', parentId: 'social', custom: false },
+
+    { id: 'fijos-alquiler', name: 'Alquiler', icon: '🏠', color: '#3b82f6', parentId: 'fijos', custom: false },
+    { id: 'fijos-internet', name: 'Internet', icon: '🌐', color: '#6366f1', parentId: 'fijos', custom: false },
+    { id: 'fijos-celular',  name: 'Celular',  icon: '📱', color: '#818cf8', parentId: 'fijos', custom: false },
+    { id: 'fijos-otro',     name: 'Otro',     icon: '🧾', color: '#64748b', parentId: 'fijos', custom: false },
+
+    { id: 'transporte-sube',   name: 'SUBE',       icon: '🚇', color: '#f59e0b', parentId: 'transporte', custom: false },
+    { id: 'transporte-viaje',  name: 'Viaje',      icon: '🚗', color: '#f97316', parentId: 'transporte', custom: false },
+    { id: 'transporte-bici',   name: 'Gasto bici', icon: '🚲', color: '#14b8a6', parentId: 'transporte', custom: false },
+    { id: 'transporte-otro',   name: 'Otro',       icon: '🛣️', color: '#64748b', parentId: 'transporte', custom: false },
+
+    { id: 'actividad-futbol',    name: 'Fútbol',    icon: '⚽', color: '#22c55e', parentId: 'actividad-fisica', custom: false },
+    { id: 'actividad-voley',     name: 'Voley',     icon: '🏐', color: '#8b5cf6', parentId: 'actividad-fisica', custom: false },
+    { id: 'actividad-tenis',     name: 'Tenis',     icon: '🎾', color: '#84cc16', parentId: 'actividad-fisica', custom: false },
+    { id: 'actividad-gimnasio',  name: 'Gimnasio',  icon: '🏋️', color: '#6366f1', parentId: 'actividad-fisica', custom: false },
+
+    { id: 'antojo-helado', name: 'Helado',  icon: '🍦', color: '#f97316', parentId: 'antojo', custom: false },
+    { id: 'antojo-comida', name: 'Comida',  icon: '🍔', color: '#ef4444', parentId: 'antojo', custom: false },
+    { id: 'antojo-dulce',  name: 'Dulce',   icon: '🍰', color: '#ec4899', parentId: 'antojo', custom: false },
+    { id: 'antojo-online', name: 'Online',  icon: '📦', color: '#a855f7', parentId: 'antojo', custom: false },
+
+    { id: FALLBACK_CATEGORY_ID, name: 'Otros',   icon: '📦', color: '#64748b', parentId: 'otros', custom: false },
+    { id: 'otros-regalo',  name: 'Regalos', icon: '🎁', color: '#f43f5e', parentId: 'otros', custom: false },
+    { id: 'otros-salud',   name: 'Salud',   icon: '💊', color: '#ef4444', parentId: 'otros', custom: false },
+    { id: 'otros-libro',   name: 'Libro',   icon: '📚', color: '#3b82f6', parentId: 'otros', custom: false },
+    { id: 'otros-ropa',    name: 'Ropa',    icon: '👕', color: '#8b5cf6', parentId: 'otros', custom: false }
+  ];
+
+  /* Categorías de la versión anterior: se migran para no perder gastos. */
+  var LEGACY_CATEGORY_MAP = {
+    alimentacion: 'comida-supermercado',
+    facturas: 'fijos-otro',
+    transporte: 'transporte-otro',
+    universidad: 'otros-libro',
+    ocio: 'social-bar',
+    salud: 'otros-salud',
+    otros: FALLBACK_CATEGORY_ID
+  };
 
   /* --- Estado ------------------------------------------------------------ */
   var state = createInitialState();
@@ -55,6 +114,7 @@ window.App = window.App || {};
       name: String(c.name || 'Sin nombre'),
       icon: String(c.icon || '🏷️'),
       color: /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#64748b',
+      parentId: c.parentId ? String(c.parentId) : null,
       custom: !!c.custom
     };
   }
@@ -72,13 +132,15 @@ window.App = window.App || {};
 
   function normalizeExpense(e) {
     if (!e) return null;
+    var rawId = String(e.categoryId || FALLBACK_CATEGORY_ID);
     return {
       id: e.id || Utils.uid('exp'),
       date: e.date || Utils.todayISO(),
       amount: Utils.round2(e.amount),
       description: String(e.description || 'Gasto'),
-      categoryId: e.categoryId || 'otros',
-      method: PAYMENT_METHODS.indexOf(e.method) >= 0 ? e.method : PAYMENT_METHODS[0],
+      categoryId: LEGACY_CATEGORY_MAP[rawId] || rawId,
+      // Pagos con "Mercado Pago / Billetera" pasan al único método digital.
+      method: PAYMENT_METHODS.indexOf(e.method) >= 0 ? e.method : DEFAULT_PAYMENT_METHOD,
       billId: e.billId || null
     };
   }
@@ -103,13 +165,16 @@ window.App = window.App || {};
 
     var categories = (Array.isArray(raw.categories) ? raw.categories : [])
       .map(normalizeCategory)
-      .filter(Boolean);
+      .filter(Boolean)
+      // Las categorías viejas se reemplazan por sus equivalentes; las propias se mantienen.
+      .filter(function (c) { return !LEGACY_CATEGORY_MAP[c.id]; });
 
-    // Garantiza que siempre exista la categoría "otros" (fallback seguro).
-    if (!categories.some(function (c) { return c.id === 'otros'; })) {
-      categories.push({ id: 'otros', name: 'Otros', icon: '📦', color: '#64748b', custom: false });
+    if (!categories.some(function (c) { return c.id === FALLBACK_CATEGORY_ID; })) {
+      categories.push({
+        id: FALLBACK_CATEGORY_ID, name: 'Otros', icon: '📦',
+        color: '#64748b', parentId: 'otros', custom: false
+      });
     }
-    // Asegura también las categorías por defecto que falten.
     DEFAULT_CATEGORIES.forEach(function (def) {
       if (!categories.some(function (c) { return c.id === def.id; })) categories.push(Object.assign({}, def));
     });
@@ -123,7 +188,7 @@ window.App = window.App || {};
       incomes: (Array.isArray(raw.incomes) ? raw.incomes : []).map(normalizeIncome).filter(Boolean),
       expenses: (Array.isArray(raw.expenses) ? raw.expenses : []).map(normalizeExpense).filter(Boolean)
         .map(function (e) {
-          if (ids.indexOf(e.categoryId) < 0) e.categoryId = 'otros';
+          if (ids.indexOf(e.categoryId) < 0) e.categoryId = FALLBACK_CATEGORY_ID;
           return e;
         }),
       bills: (Array.isArray(raw.bills) ? raw.bills : []).map(normalizeBill).filter(Boolean)
@@ -175,9 +240,37 @@ window.App = window.App || {};
     /* --- Catálogos --- */
     categories: function () { return state.categories.slice(); },
     paymentMethods: function () { return PAYMENT_METHODS.slice(); },
+    defaultPaymentMethod: function () { return DEFAULT_PAYMENT_METHOD; },
+    defaultCategoryId: function () { return DEFAULT_CATEGORY_ID; },
+    billsCategoryId: function () { return BILLS_CATEGORY_ID; },
+    fallbackCategoryId: function () { return FALLBACK_CATEGORY_ID; },
+
+    groups: function () {
+      return DEFAULT_GROUPS.map(function (g) { return Object.assign({}, g); });
+    },
+    groupById: function (id) {
+      return DEFAULT_GROUPS.filter(function (g) { return g.id === id; })[0] || null;
+    },
+    categoriesInGroup: function (groupId) {
+      return state.categories.filter(function (c) { return c.parentId === groupId; });
+    },
+    customCategories: function () {
+      return state.categories.filter(function (c) { return !c.parentId; });
+    },
+    groupOfCategory: function (id) {
+      var cat = Store.categoryById(id);
+      return cat.parentId ? Store.groupById(cat.parentId) : null;
+    },
+    /** Etiqueta completa, por ejemplo "Comida · Supermercado". */
+    categoryLabel: function (id) {
+      var cat = Store.categoryById(id);
+      var group = Store.groupOfCategory(id);
+      return group ? group.name + ' · ' + cat.name : cat.name;
+    },
     categoryById: function (id) {
       return state.categories.filter(function (c) { return c.id === id; })[0] || {
-        id: 'otros', name: 'Otros', icon: '📦', color: '#64748b', custom: false
+        id: FALLBACK_CATEGORY_ID, name: 'Otros', icon: '📦', color: '#64748b',
+        parentId: 'otros', custom: false
       };
     },
 
@@ -195,12 +288,14 @@ window.App = window.App || {};
       return category;
     },
 
-    /** Elimina una categoría propia reasignando sus gastos a "otros". */
+    /** Elimina una categoría propia reasignando sus gastos a "Otros". */
     removeCategory: function (id) {
       var cat = Store.categoryById(id);
       if (!cat.custom) return false;
       state.categories = state.categories.filter(function (c) { return c.id !== id; });
-      state.expenses.forEach(function (e) { if (e.categoryId === id) e.categoryId = 'otros'; });
+      state.expenses.forEach(function (e) {
+        if (e.categoryId === id) e.categoryId = FALLBACK_CATEGORY_ID;
+      });
       commit();
       return true;
     },
@@ -273,7 +368,7 @@ window.App = window.App || {};
 
     /**
      * Marca un vencimiento como pagado. Si `asExpense` es true, además
-     * registra el gasto en la categoría "Facturas / Servicios".
+     * registra el gasto en "Fijos / Otro" con el método por defecto.
      */
     payBill: function (id, asExpense) {
       var bill = state.bills.filter(function (b) { return b.id === id; })[0];
@@ -288,8 +383,8 @@ window.App = window.App || {};
           date: Utils.todayISO(),
           amount: bill.amount,
           description: bill.name,
-          categoryId: 'facturas',
-          method: PAYMENT_METHODS[1],
+          categoryId: BILLS_CATEGORY_ID,
+          method: DEFAULT_PAYMENT_METHOD,
           billId: bill.id
         });
         state.expenses.push(expense);
@@ -337,16 +432,38 @@ window.App = window.App || {};
         - Utils.sum(state.expenses, function (e) { return e.amount; }));
     },
 
-    /** Totales por categoría en un mes, ordenados de mayor a menor. */
-    categoryTotalsInMonth: function (monthKey) {
+    /**
+     * Totales en un mes, ordenados de mayor a menor.
+     * mode 'group' (por defecto) agrupa por categoría de primer nivel;
+     * mode 'sub' agrupa por subcategoría (gastos con etiqueta "Grupo · Sub").
+     */
+    categoryTotalsInMonth: function (monthKey, mode) {
+      var bySub = mode === 'sub';
       var expenses = Store.expensesInMonth(monthKey);
-      var grouped = Utils.groupBy(expenses, function (e) { return e.categoryId; });
+      var grouped = Utils.groupBy(expenses, function (e) {
+        if (bySub) return e.categoryId;
+        var cat = Store.categoryById(e.categoryId);
+        return cat.parentId || e.categoryId;
+      });
 
-      return Object.keys(grouped).map(function (catId) {
-        var items = grouped[catId];
+      return Object.keys(grouped).map(function (key) {
+        var items = grouped[key];
         var total = Utils.sum(items, function (e) { return e.amount; });
+        var cat = Store.categoryById(key);
+        var bucket = bySub
+          ? {
+              id: key,
+              name: Store.categoryLabel(key),
+              icon: cat.icon,
+              color: cat.color
+            }
+          : (Store.groupById(key) || {
+              name: cat.name,
+              icon: cat.icon,
+              color: cat.color
+            });
         return {
-          category: Store.categoryById(catId),
+          category: bucket,
           total: Utils.round2(total),
           count: items.length,
           average: Utils.round2(total / items.length)
@@ -382,6 +499,7 @@ window.App = window.App || {};
       commit();
     },
 
+    DEFAULT_GROUPS: DEFAULT_GROUPS,
     DEFAULT_CATEGORIES: DEFAULT_CATEGORIES
   };
 

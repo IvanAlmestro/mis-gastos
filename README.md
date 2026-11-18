@@ -76,19 +76,27 @@ en `index.html`. `core/` es el motor y `views/` las pantallas.
 ### 2. Anotador rápido de gastos
 - Formulario pensado para cargar un gasto en segundos: descripción, monto,
   fecha (por defecto hoy), categoría y medio de pago.
-- **Categorías predefinidas** con ícono y color:
-  *Alimentación / Súper, Facturas / Servicios, Transporte, Universidad / Apuntes,
-  Salidas / Ocio, Salud / Deporte, Otros*.
-- **Chips de categoría** para seleccionar con un clic y **crear categorías propias**
-  (nombre, emoji y color). Las categorías propias se pueden eliminar (sus gastos pasan a *Otros*).
-- **Medios de pago**: Efectivo, Débito / Transferencia, Mercado Pago / Billetera.
-- Historial con **buscador** (descripción, categoría o medio de pago), **filtro por categoría**
-  y botones de **editar** y **eliminar**.
+- **Categorías de dos niveles**: elegís un grupo y después una subcategoría.
+  - **Comida**: Supermercado, Verdulería, Carnicería, Pollería, Panadería, Agua.
+  - **Social**: Juntada de pibes, Bar, Evento.
+  - **Fijos**: Alquiler, Internet, Celular, Otro.
+  - **Transporte**: SUBE, Viaje, Gasto bici, Otro.
+  - **Actividad física**: Fútbol, Voley, Tenis, Gimnasio.
+  - **Antojo**: Helado, Comida, Dulce, Online.
+  - **Otros**: Otros, Regalos, Salud, Libro, Ropa.
+- **Chips en dos niveles**: fila de grupos y, debajo, las subcategorías del grupo activo.
+  También podés **crear categorías propias** (nombre, emoji y color), que aparecen en *Propias*;
+  al eliminarlas sus gastos pasan a *Otros*.
+- **Medios de pago**: solo **Efectivo** y **Débito / Transferencia** (por defecto).
+  Los gastos viejos con *Mercado Pago / Billetera* se migran automáticamente a débito/transferencia.
+- Historial con **buscador** (descripción, grupo/subcategoría o medio de pago), **filtro por
+  subcategoría** agrupado y botones de **editar** y **eliminar**.
 
 ### 3. Estadísticas para recortar gastos
-- Gráfico **Chart.js** con el monto y el porcentaje por categoría, con dos modos:
-  **🍩 torta** y **📊 barras horizontales**.
-- Desglose numérico con barras de proporción.
+- Gráfico **Chart.js** con el monto y el porcentaje, con dos modos: **🍩 torta** y
+  **📊 barras horizontales**, y un selector para verlo **por categoría** (grupos) o
+  **por subcategoría** (ej. *Comida · Supermercado*).
+- Desglose numérico con barras de proporción (sigue el selector anterior).
 - Tres tarjetas de diagnóstico rápido:
   - **Top gastos más grandes** → los 3 gastos individuales más altos del mes.
   - **Categoría más frecuente** → la de mayor cantidad de transacciones (gastos hormiga),
@@ -101,7 +109,8 @@ en `index.html`. `core/` es el motor y `views/` las pantallas.
 - **Alertas visuales automáticas**: etiqueta **amarilla** si vence dentro de los próximos
   5 días, **roja** si está vencido, y un contador en la pestaña con lo que requiere atención.
 - Botón **“✓ Pagar”** que pregunta si querés **descontar automáticamente el monto como gasto**
-  en la categoría *Facturas / Servicios*. También se puede deshacer el pago (y elimina el gasto asociado).
+  en *Fijos · Otro* con el medio de pago por defecto. También se puede deshacer el pago
+  (y elimina el gasto asociado).
 - Resumen de total pendiente, vencidos y próximos a vencer.
 
 ### Extras
@@ -230,17 +239,21 @@ salgan de tu dispositivo**, no configures esta sección: la app sigue siendo 100
 {
   "version": 1,
   "updatedAt": 1794861374900,
-  "categories": [{ "id": "alimentacion", "name": "Alimentación / Súper", "icon": "🛒", "color": "#10b981", "custom": false }],
+  "categories": [{ "id": "comida-supermercado", "name": "Supermercado", "icon": "🛒", "color": "#10b981", "parentId": "comida", "custom": false }],
   "incomes":  [{ "id": "inc_x", "date": "2026-11-01", "amount": 150000, "concept": "Transferencia mensual", "note": "" }],
-  "expenses": [{ "id": "exp_y", "date": "2026-11-03", "amount": 18000, "description": "Súper", "categoryId": "alimentacion", "method": "Débito / Transferencia", "billId": null }],
+  "expenses": [{ "id": "exp_y", "date": "2026-11-03", "amount": 18000, "description": "Súper", "categoryId": "comida-supermercado", "method": "Débito / Transferencia", "billId": null }],
   "bills":    [{ "id": "bill_z", "name": "Internet", "amount": 12000, "dueDate": "2026-11-20", "status": "pendiente", "paidAt": null, "expenseId": null }]
 }
 ```
 
-Al importar, el estado se **normaliza**: se garantizan las categorías por defecto y
-cualquier gasto con una categoría inexistente se reasigna a *Otros*. El campo `updatedAt`
-(marca de tiempo del último cambio) es el que usa la sincronización para decidir qué
-versión gana.
+Los grupos (Comida, Social, Fijos, Transporte, Actividad física, Antojo, Otros) son
+definiciones fijas en `js/core/store.js`; cada gasto guarda la **subcategoría** en
+`categoryId`. Al importar o cargar desde `localStorage`, el estado se **normaliza**: se
+garantizan todas las subcategorías por defecto, se migran las categorías de versiones
+anteriores (*Alimentación / Súper* → *Comida · Supermercado*, *Facturas / Servicios* →
+*Fijos · Otro*, etc.), se convierte *Mercado Pago / Billetera* a *Débito / Transferencia* y
+cualquier categoría inexistente se reasigna a *Otros*. El campo `updatedAt` (marca del
+último cambio) es el que usa la sincronización para decidir qué versión gana.
 
 ---
 

@@ -38,3 +38,6 @@ Thumbs.db
 
 # Vercel local
 .vercel/
+
+# Proyecto separado que vive dentro de esta carpeta (no se despliega)
+Control-gastos/

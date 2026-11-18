@@ -169,8 +169,8 @@ El repo ya incluye el workflow `.github/workflows/deploy-pages.yml` y `.nojekyll
 > archivo `.nojekyll` evita que Jekyll interfiera con las carpetas `css/` y `js/`.
 
 > **Caché:** GitHub Pages sirve los archivos con `cache-control: max-age=600` (10 min).
-> Por eso `index.html` carga el CSS y los JS con `?v=2`. **Cada vez que modifiques
-> código, subí ese número** (por ejemplo `?v=3`) en todas las etiquetas: así los
+> Por eso `index.html` carga el CSS y los JS con `?v=3`. **Cada vez que modifiques
+> código, subí ese número** (por ejemplo `?v=4`) en todas las etiquetas: así los
 > dispositivos descargan la versión nueva sin esperar ni hacer "recarga forzada".
 
 ### ☁️ Sincronización entre PC y celular

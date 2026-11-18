@@ -54,52 +54,78 @@ window.App = window.App || {};
       : Store.defaultPaymentMethod();
   }
 
-  /** Dibuja los chips en dos niveles: grupo → subcategorías del grupo activo. */
+  /** Dibuja el selector en dos niveles: grupo → subcategorías del grupo activo. */
   function renderCategoryChips() {
     var container = $('category-chips');
     var current = $('expense-category').value;
     var activeGroup = Store.groupOfCategory(current);
     var activeKey = activeGroup ? activeGroup.id : 'custom';
+    var selected = Store.categoryById(current);
+    var custom = Store.customCategories();
 
-    function chipStyle(color, active) {
-      return active
-        ? 'background:' + color + ';color:#fff'
-        : 'background:' + color + '1f;color:' + color;
+    /** Color del grupo aplicado con un tinte suave cuando está activo. */
+    function toneStyle(color, active) {
+      return '--cat-color:' + color + ';' +
+        (active ? 'background:' + color + '24;color:' + color + ';' : '');
     }
 
     var groupsHtml = Store.groups().map(function (group) {
       var active = group.id === activeKey;
-      return '<button type="button" class="chip" data-group="' + Utils.escapeHtml(group.id) + '"' +
-        ' aria-pressed="' + active + '" style="' + chipStyle(group.color, active) + '">' +
-        Utils.escapeHtml(group.icon + '  ' + group.name) + '</button>';
+      return '<button type="button" class="cat-group" data-group="' + Utils.escapeHtml(group.id) + '"' +
+        ' aria-pressed="' + active + '" style="' + toneStyle(group.color, active) + '">' +
+        '<span aria-hidden="true">' + Utils.escapeHtml(group.icon) + '</span>' +
+        Utils.escapeHtml(group.name) + '</button>';
     }).join('');
 
-    var custom = Store.customCategories();
     if (custom.length) {
-      var active = activeKey === 'custom';
-      groupsHtml += '<button type="button" class="chip" data-group="custom"' +
-        ' aria-pressed="' + active + '" style="' + chipStyle('#6366f1', active) + '">⭐  Propias</button>';
+      groupsHtml += '<button type="button" class="cat-group" data-group="custom"' +
+        ' aria-pressed="' + (activeKey === 'custom') + '"' +
+        ' style="' + toneStyle('#6366f1', activeKey === 'custom') + '">⭐ Propias</button>';
     }
 
-    var subCategories = activeKey === 'custom' ? custom : Store.categoriesInGroup(activeKey);
-    var subHtml = subCategories.map(function (cat) {
-      var active = cat.id === current;
-      var remove = cat.custom
-        ? '<span class="chip-remove" data-remove="' + Utils.escapeHtml(cat.id) + '" title="Eliminar categoría">✕</span>'
-        : '';
-      return '<button type="button" class="chip chip-sub" data-cat="' + Utils.escapeHtml(cat.id) + '"' +
-        ' aria-pressed="' + active + '" style="' + chipStyle(cat.color, active) + '">' +
-        Utils.escapeHtml(cat.icon + '  ' + cat.name) + remove + '</button>';
-    }).join('');
+    groupsHtml += '<button type="button" class="cat-group cat-group-add" data-new-category>' +
+      '＋ Nueva categoría</button>';
 
-    var newChip = '<button type="button" class="chip chip-add" data-new-category>＋ Nueva categoría</button>';
+    var subCategories = activeKey === 'custom' ? custom : Store.categoriesInGroup(activeKey);
+    var activeName = activeKey === 'custom'
+      ? 'Propias'
+      : (Store.groupById(activeKey) ? Store.groupById(activeKey).name : 'Otros');
+
+    var subHtml = subCategories.length
+      ? subCategories.map(function (cat) {
+          var active = cat.id === current;
+          var remove = cat.custom
+            ? '<span class="cat-remove" data-remove="' + Utils.escapeHtml(cat.id) +
+              '" title="Eliminar categoría">✕</span>'
+            : '';
+          return '<button type="button" class="cat-tile" data-cat="' + Utils.escapeHtml(cat.id) + '"' +
+            ' aria-pressed="' + active + '" style="' + toneStyle(cat.color, active) + '">' +
+              remove +
+              '<span class="cat-tile-check" aria-hidden="true">✓</span>' +
+              '<span class="cat-tile-icon" aria-hidden="true">' + Utils.escapeHtml(cat.icon) + '</span>' +
+              '<span class="cat-tile-name">' + Utils.escapeHtml(cat.name) + '</span>' +
+            '</button>';
+        }).join('')
+      : '<p class="cat-picker-hint" style="grid-column:1/-1">Todavía no hay subcategorías en este grupo.</p>';
 
     container.innerHTML =
-      '<div class="flex flex-wrap gap-2">' + groupsHtml + newChip + '</div>' +
-      '<p class="mb-2 mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">' +
-        'Subcategorías' +
-      '</p>' +
-      '<div class="flex flex-wrap gap-2">' + subHtml + '</div>';
+      '<div class="cat-picker">' +
+        '<div class="cat-picker-head">' +
+          '<div>' +
+            '<p class="cat-picker-title">Categoría</p>' +
+            '<p class="cat-picker-hint">Elegí un grupo y después la subcategoría</p>' +
+          '</div>' +
+          '<span class="cat-picker-current">' +
+            Utils.escapeHtml(selected.icon + '  ' + Store.categoryLabel(current)) +
+          '</span>' +
+        '</div>' +
+        '<div class="cat-groups">' + groupsHtml + '</div>' +
+        '<div class="cat-subs-head">' +
+          '<span>Subcategorías de <strong>' + Utils.escapeHtml(activeName) + '</strong></span>' +
+          '<span>' + subCategories.length + ' opciones</span>' +
+        '</div>' +
+        '<div class="cat-subs">' + subHtml + '</div>' +
+      '</div>';
   }
 
   /* --- Historial --------------------------------------------------------- */

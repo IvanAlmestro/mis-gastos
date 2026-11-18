@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark" />
   <title>Mis Gastos · Panel del estudiante</title>
   <meta name="description" content="Control de gastos personales y presupuesto mensual para estudiantes." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
 
   <!-- Tailwind CSS (CDN) -------------------------------------------------- -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -52,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=2" />
+  <link rel="stylesheet" href="css/styles.css?v=3" />
 </head>
 
 <body class="min-h-screen font-sans antialiased">
@@ -261,8 +262,7 @@
 
         <!-- Chips de categorías: selección rápida + gestión de categorías propias -->
         <div class="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Categorías</p>
-          <div id="category-chips" class="flex flex-wrap gap-2"></div>
+          <div id="category-chips"></div>
         </div>
       </div>
 
@@ -452,21 +452,21 @@
        abriendo el archivo index.html directamente (file://) sin servidor.
        core/ = motor (estado, ui, tema, gráficos, sync) · views/ = pantallas.
 
-       El "?v=2" es un cache-buster: GitHub Pages sirve los archivos con
+       El "?v=3" es un cache-buster: GitHub Pages sirve los archivos con
        cache de 10 minutos, así que al cambiar código hay que subir el número
        para que los dispositivos descarguen la versión nueva sin esperar.
        ===================================================================== -->
-  <script src="js/core/utils.js?v=2"></script>
-  <script src="js/core/store.js?v=2"></script>
-  <script src="js/core/ui.js?v=2"></script>
-  <script src="js/core/charts.js?v=2"></script>
-  <script src="js/core/theme.js?v=2"></script>
-  <script src="js/core/firebase-config.js?v=2"></script>
-  <script src="js/core/sync.js?v=2"></script>
-  <script src="js/views/budget.js?v=2"></script>
-  <script src="js/views/expenses.js?v=2"></script>
-  <script src="js/views/stats.js?v=2"></script>
-  <script src="js/views/bills.js?v=2"></script>
-  <script src="js/app.js?v=2"></script>
+  <script src="js/core/utils.js?v=3"></script>
+  <script src="js/core/store.js?v=3"></script>
+  <script src="js/core/ui.js?v=3"></script>
+  <script src="js/core/charts.js?v=3"></script>
+  <script src="js/core/theme.js?v=3"></script>
+  <script src="js/core/firebase-config.js?v=3"></script>
+  <script src="js/core/sync.js?v=3"></script>
+  <script src="js/views/budget.js?v=3"></script>
+  <script src="js/views/expenses.js?v=3"></script>
+  <script src="js/views/stats.js?v=3"></script>
+  <script src="js/views/bills.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
 </body>
 </html>

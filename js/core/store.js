@@ -163,11 +163,20 @@ window.App = window.App || {};
     var base = createInitialState();
     if (!raw || typeof raw !== 'object') return base;
 
+    var defaultsById = {};
+    DEFAULT_CATEGORIES.forEach(function (d) { defaultsById[d.id] = d; });
+
     var categories = (Array.isArray(raw.categories) ? raw.categories : [])
       .map(normalizeCategory)
       .filter(Boolean)
       // Las categorías viejas se reemplazan por sus equivalentes; las propias se mantienen.
-      .filter(function (c) { return !LEGACY_CATEGORY_MAP[c.id]; });
+      .filter(function (c) { return !LEGACY_CATEGORY_MAP[c.id]; })
+      // Repara las categorías por defecto que vinieron sin `parentId` (por ejemplo,
+      // datos que hizo circular un dispositivo con una versión vieja de la app).
+      .map(function (c) {
+        var def = defaultsById[c.id];
+        return def ? Object.assign({}, def) : c;
+      });
 
     if (!categories.some(function (c) { return c.id === FALLBACK_CATEGORY_ID; })) {
       categories.push({
